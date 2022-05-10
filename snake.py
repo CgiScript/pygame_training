@@ -3,6 +3,7 @@ import random
 
 pygame.init()
 pygame.font.init()
+pygame.display.set_caption("Snake")
 
 BLACK = [0,0,0]
 GREEN = [0,255,0]
@@ -16,6 +17,8 @@ screen = pygame.display.set_mode([WIDTH, HEIGHT])
 font = pygame.font.SysFont('Comic Sans MS', 70)
 score_font = pygame.font.SysFont('Comic Sans MS', 15)
 
+eating_sound = pygame.mixer.Sound("eat.wav")
+
 difficulty = 10
 wall = False
 obstacle = False
@@ -25,11 +28,13 @@ def game_screen():
     global state, obstacle
     
     score = 0
-    score_text = font.render("{}".format(score),True,(255,255,255))
+    score_text = font.render("{}".format(score),True,(255,255,255))    
     size = 25
+    screen_coords = set([(x,y) for x in range(0,800,size) for y in range(0,600,size)])
+    score_coords = set([(x,y) for x in range(400,451,size) for y in range(0,101,size)])
     
     snake = pygame.Surface([size, size])
-    snake.fill(GREEN)
+    snake.fill(GREEN,((4,4),(21,21)))
     snake_rect = snake.get_rect()
     snake_rect.x = screen.get_rect().centerx
     snake_rect.y = screen.get_rect().centery
@@ -37,13 +42,13 @@ def game_screen():
     
 
     food = pygame.Surface((size,size))
-    food.fill((255,0,0))
+    food.fill((225,0,0))
     food_rect = food.get_rect()
 
     # generate obstacle
     if obstacle:
-        line1 = pygame.Surface((500, 25))
-        line2 = pygame.Surface((500, 25))
+        line1 = pygame.Surface((500, size))
+        line2 = pygame.Surface((500, size))
         line1_rect = line1.get_rect()
         line2_rect = line2.get_rect()
         line1.fill((255,255,255)); line2.fill((255,255,255))
@@ -53,7 +58,7 @@ def game_screen():
 
     def generate_cell():
         cell = pygame.Surface([size, size])
-        cell.fill(GREEN)
+        cell.fill(GREEN,((4,4),(21,21)))
         return cell
     
     # create initial body cells
@@ -61,7 +66,7 @@ def game_screen():
     snake_body = [generate_cell() for i in range(5)]    
     body_rects = [body.get_rect() for body in snake_body]    
     for body in snake_body:
-        body.fill(GREEN)
+        body.fill(GREEN,((4,4),(21,21)))
     body_dict = dict(zip(snake_body, body_rects))
 
     # place body cells to center of screen
@@ -75,10 +80,16 @@ def game_screen():
     def generate_food():
         global obstacle
         nonlocal obstacle_list
-
-        food_rect.x = random.randint(0,31) * size
-        food_rect.y = random.randint(0,23) * size
-
+        snake_coords = []
+        
+        for rect in body_rects:
+            snake_coords.append((rect.x,rect.y))
+          
+        snake_coords.append((snake_rect.x,snake_rect.y))       
+        clean_area = (screen_coords - set(snake_coords))- score_coords       
+        coord = random.sample(clean_area,1)[0]        
+        food_rect.x,food_rect.y = coord[0],coord[1]
+            
         if obstacle:
             for obst in obstacle_list:
                 if obst.colliderect(food_rect):
@@ -115,19 +126,7 @@ def game_screen():
     def check_collide():
         
         global state
-        nonlocal score, score_text
-
-        if snake_rect.colliderect(food_rect):
-            generate_food()
-            cell = generate_cell()
-            cell_rect = cell.get_rect()
-            cell_rect.x = body_rects[len(body_rects)-1].x
-            cell_rect.y = body_rects[len(body_rects)-1].y
-            snake_body.append(cell)
-            body_rects.append(cell_rect)
-            body_dict[cell] = cell_rect
-            score = score + 2
-            score_text = font.render("{}".format(score),True,(255,255,255))            
+        nonlocal score, score_text         
 
         if not wall:
             if snake_rect.right > WIDTH:
@@ -143,6 +142,19 @@ def game_screen():
                 state = "main_menu"
             if snake_rect.top < 0 or snake_rect.y > HEIGHT:
                 state = "main_menu"
+
+        if snake_rect.colliderect(food_rect):
+            eating_sound.play()
+            generate_food()
+            cell = generate_cell()
+            cell_rect = cell.get_rect()
+            cell_rect.x = body_rects[len(body_rects)-1].x
+            cell_rect.y = body_rects[len(body_rects)-1].y
+            snake_body.append(cell)
+            body_rects.append(cell_rect)
+            body_dict[cell] = cell_rect
+            score = score + 2
+            score_text = font.render("{}".format(score),True,(255,255,255))  
             
 
         for body in body_rects:
